@@ -113,7 +113,7 @@ def read_patient_pickle():
             patient
 
 
-def input_locations_and_create_pickles():
+def create_patient_pickles():
     print("Root directory path:")
     root_directory = input()
     print("Output pickle files' directory path:")
@@ -139,7 +139,7 @@ def input_locations_and_create_pickles():
         save_patient_to_pickle(patient, output_path)
 
 
-#input_locations_and_create_pickles()
+#create_patient_pickles()
 #read_patient_pickle()
 
 
