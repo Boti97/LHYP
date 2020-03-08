@@ -9,13 +9,22 @@ try:
 except ModuleNotFoundError:
     import pickle
 
+start_time = 0
+
+
+class ContourFileError(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+
 
 class Patient:
 
     def __init__(self, contour_reader, dicom_reader):
+        print(time.time() - start_time)
         contours = contour_reader.get_hierarchical_contours()
 
         # separate diastole and systole by the first available frame
+        # if we dont find a lp, we look for and ln
         contour_a = None
         contour_b = None
         a_frame, b_frame = 0, 0
@@ -36,7 +45,7 @@ class Patient:
                         break
 
         if a_frame == 0 or b_frame == 0 or contour_a is None or contour_b is None:
-            return
+            raise ContourFileError("Unable to find proper contour for patient")
 
         dia_frame, sys_frame = get_diastole_and_systole_frame(contour_a, contour_b, a_frame, b_frame)
 
@@ -51,11 +60,11 @@ class Patient:
         self.age = 0
 
 
-def get_sublists(original_list, number_of_sub_list_wanted):
-    sublists = list()
+def get_sub_lists(original_list, number_of_sub_list_wanted):
+    sub_lists = list()
     for sub_list_count in range(number_of_sub_list_wanted):
-        sublists.append(original_list[sub_list_count::number_of_sub_list_wanted])
-    return sublists
+        sub_lists.append(original_list[sub_list_count::number_of_sub_list_wanted])
+    return sub_lists
 
 
 def get_diastole_and_systole_frame(cont_a, cont_b, a_frame, b_frame):
@@ -106,11 +115,11 @@ def read_patient_pickle():
     print("Pickles' directory path:")
     input_path = input()
     pickle_list = os.listdir(input_path)
+    patients = []
     for pickle_file in pickle_list:
         full_out_path = input_path + "/" + pickle_file
         with open(full_out_path, 'rb') as input_file:
-            patient = pickle.load(input_file)
-            patient
+            patients.append(pickle.load(input_file))
 
 
 def create_patient_pickles():
@@ -118,16 +127,9 @@ def create_patient_pickles():
     root_directory = input()
     print("Output pickle files' directory path:")
     output_path = input()
-    """
 
-    image_folder = 'C:/MyLife/School/MSc/8.felev/sample/8494150AMR806/sa/images'
-    con_file = 'C:/MyLife/School/MSc/8.felev/sample/8494150AMR806/sa/contours.con'
-    output_path = 'C:/MyLife/School/MSc/8.felev/Onlab/k_boti/pickles/'
-    
-
-    root_directory = 'C:/MyLife/School/MSc/8.felev/sample'
-    output_path = 'C:/MyLife/School/MSc/8.felev/Onlab/k_boti/pickles'
-    """
+    global start_time
+    start_time = time.time()
 
     patient_list = os.listdir(root_directory)
     for folder in patient_list:
@@ -135,11 +137,16 @@ def create_patient_pickles():
         con_file = root_directory + "/" + folder + "/sa/contours.con"
         dr = DCMreaderVM(image_folder)
         cr = CONreaderVM(con_file)
-        patient = Patient(cr, dr)
-        save_patient_to_pickle(patient, output_path)
+        try:
+            patient = Patient(cr, dr)
+            save_patient_to_pickle(patient, output_path)
+        except ContourFileError as err:
+            print(err)
+
+    print(time.time() - start_time)
 
 
-#create_patient_pickles()
-#read_patient_pickle()
+create_patient_pickles()
+#patients = read_patient_pickle()
 
 
