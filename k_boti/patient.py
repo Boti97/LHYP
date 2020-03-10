@@ -25,39 +25,76 @@ class Patient:
 
         # separate diastole and systole by the first available frame
         # if we dont find a lp, we look for and ln
-        contour_a = None
-        contour_b = None
-        a_frame, b_frame = 0, 0
-        for slc in contours:
-            if len(contours[slc]) > 1:
-                if a_frame == 0 and b_frame == 0 and len(contours[slc]) == 2:
-                    a_frame, b_frame = contours[slc]
+        slc_fr_list, slc_fr_cont = get_frames_and_contours(contours)
 
-                if "lp" in contours[slc][a_frame]:
-                    contour_a = contours[slc][a_frame]["lp"].tolist()
-                    if "lp" in contours[slc][b_frame]:
-                        contour_b = contours[slc][b_frame]["lp"].tolist()
-                        break
-                elif "ln" in contours[slc][a_frame]:
-                    contour_a = contours[slc][a_frame]["ln"].tolist()
-                    if "ln" in contours[slc][b_frame]:
-                        contour_b = contours[slc][b_frame]["ln"].tolist()
-                        break
-
-        if a_frame == 0 or b_frame == 0 or contour_a is None or contour_b is None:
-            raise ContourFileError("Unable to find proper contour for patient")
-
-        dia_frame, sys_frame = get_diastole_and_systole_frame(contour_a, contour_b, a_frame, b_frame)
+        dia_frame, sys_frame = get_diastole_and_systole_frame(slc_fr_list, slc_fr_cont)
 
         # set diastole images
-        self.dia_images = get_images_by_position(dicom_reader, get_image_positions(contours, dia_frame))
-        self.sys_images = get_images_by_position(dicom_reader, get_image_positions(contours, sys_frame))
+        dia_slc_frame_a, dia_slc_frame_b, dia_slc_frame_c = get_image_positions(contours, dia_frame)
+        sys_slc_frame_a, sys_slc_frame_b, sys_slc_frame_c = get_image_positions(contours, sys_frame)
+        self.dia_ln_contours = get_contours_by_positions_and_mode(contours, (dia_slc_frame_a, dia_slc_frame_b, dia_slc_frame_c), "ln")
+        self.dia_lp_contours = get_contours_by_positions_and_mode(contours, (dia_slc_frame_a, dia_slc_frame_b, dia_slc_frame_c), "lp")
+        self.sys_ln_contours = get_contours_by_positions_and_mode(contours, (sys_slc_frame_a, sys_slc_frame_b, sys_slc_frame_c ), "ln")
+        self.sys_lp_contours = get_contours_by_positions_and_mode(contours, (sys_slc_frame_a, sys_slc_frame_b, sys_slc_frame_c ), "lp")
+
+        self.dia_images = get_images_by_position(dicom_reader, (dia_slc_frame_a, dia_slc_frame_b, dia_slc_frame_c))
+        self.sys_images = get_images_by_position(dicom_reader, (sys_slc_frame_a, sys_slc_frame_b, sys_slc_frame_c))
         self.study_id = contour_reader.volume_data["Study_id="]
         self.patient_weight = contour_reader.volume_data["Patient_weight="]
         self.Patient_height = contour_reader.volume_data["Patient_height"]
         self.Patient_gender = contour_reader.volume_data["Patient_gender="]
 
         self.age = 0
+
+
+def simplify_contours(contours):
+    cont_list = []
+    for slc in contours:
+        for frm in contours[slc]:
+            for mode in contours[slc][frm]:
+                cont_list.append((slc, frm, mode))
+    return cont_list
+
+
+def simplify_slc_frm_list(slc_frm_list, slc):
+    simple_slc_frm = []
+    for frm in slc_frm_list:
+        simple_slc_frm.append((slc, frm))
+    return simple_slc_frm
+
+
+def get_frames_and_contours(contours):
+    max_frames_in_slc = 1
+    cont_list = []
+    frames = []
+    for slc in contours:
+        if len(contours[slc]) > max_frames_in_slc:
+            has_ln = True
+            has_lp = True
+            for con_frame in contours[slc]:
+                if has_ln and "ln" not in contours[slc][con_frame]:
+                    has_ln = False
+                if has_lp and "lp" not in contours[slc][con_frame]:
+                    has_lp = False
+            if has_ln:
+                max_frames_in_slc = len(contours[slc])
+                frames = simplify_slc_frm_list(contours[slc], slc)
+                for sl, frm in frames:
+                    cont_list.append(contours[slc][frm]["ln"])
+            elif has_ln:
+                max_frames_in_slc = len(contours[slc])
+                frames = simplify_slc_frm_list(contours[slc])
+                for sl, frm in frames:
+                    cont_list.append(contours[slc][frm]["lp"])
+    return frames, cont_list
+
+
+def get_contours_by_positions_and_mode(contours, positions, mode):
+    spec_contours = []
+    for pos in positions:
+        if mode in contours[pos[0]][pos[1]]:
+            spec_contours.append(contours[pos[0]][pos[1]][mode])
+    return spec_contours
 
 
 def get_sub_lists(original_list, number_of_sub_list_wanted):
@@ -67,10 +104,20 @@ def get_sub_lists(original_list, number_of_sub_list_wanted):
     return sub_lists
 
 
-def get_diastole_and_systole_frame(cont_a, cont_b, a_frame, b_frame):
-    cont_a_area = get_contour_area(cont_a)
-    cont_b_area = get_contour_area(cont_b)
-    return (a_frame, b_frame) if cont_a_area > cont_b_area else (b_frame, a_frame)
+def get_diastole_and_systole_frame(frame_list, cont_list):
+    diastole_cont = None
+    diastole_frame = None
+    systole_cont = None
+    systole_frame = None
+    for i, cont in enumerate(cont_list):
+        cont_area = get_contour_area(cont)
+        if diastole_cont is None or diastole_cont < cont_area:
+            diastole_cont = cont_area
+            diastole_frame = frame_list[i][1]
+        if systole_cont is None or systole_cont > cont_area:
+            systole_cont = cont_area
+            systole_frame = frame_list[i][1]
+    return diastole_frame, systole_frame
 
 
 def get_image_positions(contours, frame):
@@ -123,10 +170,15 @@ def read_patient_pickle():
 
 
 def create_patient_pickles():
+    '''
     print("Root directory path:")
     root_directory = input()
     print("Output pickle files' directory path:")
     output_path = input()
+    '''
+
+    root_directory = 'C:/MyLife/School/MSc/8.felev/sample'
+    output_path = 'C:/MyLife/School/MSc/8.felev/Onlab/k_boti/pickles'
 
     global start_time
     start_time = time.time()
