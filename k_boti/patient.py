@@ -1,6 +1,5 @@
-from area import get_contour_area
+from geometry import get_contour_area
 from con_reader import CONreaderVM
-from dicom_reader import DCMreaderVM
 import time
 import numpy as np
 import os
@@ -18,8 +17,7 @@ class ContourFileError(Exception):
 
 
 class Patient:
-
-    def __init__(self, contour_reader, dicom_reader):
+    def __init__(self, contour_reader):
         print(time.time() - start_time)
         contours = contour_reader.get_hierarchical_contours()
 
@@ -29,24 +27,29 @@ class Patient:
 
         dia_frame, sys_frame = get_diastole_and_systole_frame(slc_fr_list, slc_fr_cont)
 
-        # set diastole images
-        dia_slc_frame_a, dia_slc_frame_b, dia_slc_frame_c = get_image_positions(contours, dia_frame)
-        sys_slc_frame_a, sys_slc_frame_b, sys_slc_frame_c = get_image_positions(contours, sys_frame)
-        self.dia_ln_contours = get_contours_by_positions_and_mode(contours, (dia_slc_frame_a, dia_slc_frame_b, dia_slc_frame_c), "ln")
-        self.dia_lp_contours = get_contours_by_positions_and_mode(contours, (dia_slc_frame_a, dia_slc_frame_b, dia_slc_frame_c), "lp")
-        self.sys_ln_contours = get_contours_by_positions_and_mode(contours, (sys_slc_frame_a, sys_slc_frame_b, sys_slc_frame_c ), "ln")
-        self.sys_lp_contours = get_contours_by_positions_and_mode(contours, (sys_slc_frame_a, sys_slc_frame_b, sys_slc_frame_c ), "lp")
+        self.dia_ln_contours, self.dia_lp_contours, self.dia_rn_contours = \
+            get_all_necessary_contours_by_frame(contours, dia_frame)
 
-        self.dia_images = get_images_by_position(dicom_reader, (dia_slc_frame_a, dia_slc_frame_b, dia_slc_frame_c))
-        self.sys_images = get_images_by_position(dicom_reader, (sys_slc_frame_a, sys_slc_frame_b, sys_slc_frame_c))
         self.study_id = contour_reader.volume_data["Study_id="]
         self.patient_weight = contour_reader.volume_data["Patient_weight="]
         self.Patient_height = contour_reader.volume_data["Patient_height"]
         self.Patient_gender = contour_reader.volume_data["Patient_gender="]
 
-        self.age = 0
+
+def get_all_necessary_contours_by_frame(contours, frame):
+    dia_ln_contours = []
+    dia_lp_contours = []
+    dia_rn_contours = []
+    for slc in contours:
+        if "ln" in contours[slc][frame] and "lp" in contours[slc][frame] and "rn" in contours[slc][frame]:
+            dia_ln_contours.append(contours[slc][frame]["ln"])
+            dia_lp_contours.append(contours[slc][frame]["lp"])
+            dia_rn_contours.append(contours[slc][frame]["rn"])
+
+    return dia_ln_contours, dia_lp_contours, dia_rn_contours
 
 
+#not used
 def simplify_contours(contours):
     cont_list = []
     for slc in contours:
@@ -81,7 +84,7 @@ def get_frames_and_contours(contours):
                 frames = simplify_slc_frm_list(contours[slc], slc)
                 for sl, frm in frames:
                     cont_list.append(contours[slc][frm]["ln"])
-            elif has_ln:
+            elif has_lp:
                 max_frames_in_slc = len(contours[slc])
                 frames = simplify_slc_frm_list(contours[slc])
                 for sl, frm in frames:
@@ -89,6 +92,7 @@ def get_frames_and_contours(contours):
     return frames, cont_list
 
 
+#not used
 def get_contours_by_positions_and_mode(contours, positions, mode):
     spec_contours = []
     for pos in positions:
@@ -97,6 +101,7 @@ def get_contours_by_positions_and_mode(contours, positions, mode):
     return spec_contours
 
 
+#not used
 def get_sub_lists(original_list, number_of_sub_list_wanted):
     sub_lists = list()
     for sub_list_count in range(number_of_sub_list_wanted):
@@ -120,23 +125,7 @@ def get_diastole_and_systole_frame(frame_list, cont_list):
     return diastole_frame, systole_frame
 
 
-def get_image_positions(contours, frame):
-    cont_list = []
-    for slc in contours:
-        for frm in contours[slc]:
-            if frm == frame:
-                cont_list.append((slc, frame))
-
-    cont_list = np.asarray(cont_list)
-    cont_list = np.array_split(cont_list, 3)
-
-    slc_frame_a = cont_list[0][len(cont_list[0]) // 2]
-    slc_frame_b = cont_list[1][len(cont_list[1]) // 2]
-    slc_frame_c = cont_list[2][len(cont_list[2]) // 2]
-
-    return slc_frame_a, slc_frame_b, slc_frame_c
-
-
+#not used
 def get_images_by_position(dicom, positioins):
     pos_1 = positioins[0]
     pos_2 = positioins[1]
@@ -158,17 +147,6 @@ def save_patient_to_pickle(patient, output_path):
         pickle.dump(patient, output)
 
 
-def read_patient_pickle():
-    print("Pickles' directory path:")
-    input_path = input()
-    pickle_list = os.listdir(input_path)
-    patients = []
-    for pickle_file in pickle_list:
-        full_out_path = input_path + "/" + pickle_file
-        with open(full_out_path, 'rb') as input_file:
-            patients.append(pickle.load(input_file))
-
-
 def create_patient_pickles():
     '''
     print("Root directory path:")
@@ -187,10 +165,9 @@ def create_patient_pickles():
     for folder in patient_list:
         image_folder = root_directory + "/" + folder + "/sa/images"
         con_file = root_directory + "/" + folder + "/sa/contours.con"
-        dr = DCMreaderVM(image_folder)
         cr = CONreaderVM(con_file)
         try:
-            patient = Patient(cr, dr)
+            patient = Patient(cr)
             save_patient_to_pickle(patient, output_path)
         except ContourFileError as err:
             print(err)
@@ -198,7 +175,12 @@ def create_patient_pickles():
     print(time.time() - start_time)
 
 
-create_patient_pickles()
-#patients = read_patient_pickle()
+def main():
+    create_patient_pickles()
+
+
+if __name__ == '__main__':
+    main()
+
 
 
