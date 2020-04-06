@@ -1,6 +1,6 @@
 import os
 
-from geometry import get_center, get_closest_point_to_line, get_array_len
+from geometry import get_center, get_closest_point_to_line, get_array_len, rotate_point_around_point
 from patient import Patient
 
 try:
@@ -15,27 +15,65 @@ class NeuralInput:
                                                      patient.dia_rn_contours)
 
 
-def get_wall_thicknesses(dia_ln_contours, dia_lp_contours, dia_rn_contours):
-    wall_thicknesses = []
-    right_ventricle_centers = []
-    left_ventricle_centers = []
-    for right_ventricle_contour in dia_rn_contours:
-        right_ventricle_centers.append(get_center(right_ventricle_contour))
-    for left_ventricle_contour in dia_lp_contours:
-        center_x, center_y = get_center(left_ventricle_contour)
-        left_ventricle_centers.append([center_x, center_y])
+def rotate_right_center_and_get_wall_thicknesses(left_center_points, right_center_points, dia_ln_contours, dia_lp_contours, angle):
+    right_center_points_for_region = []
+    for i in range(len(right_center_points)):
+        right_center_points_for_region.append(
+            rotate_point_around_point(right_center_points[i], left_center_points[i], angle))
+
+    return get_wall_thicknesses_by_region(left_center_points, right_center_points_for_region,dia_ln_contours, dia_lp_contours)
+
+
+def get_wall_thicknesses_by_region(left_center_points, right_center_points, ln_contours, lp_contours):
+    wall_thicknesses_by_region = []
     closest_points_ln = []
     closest_points_lp = []
 
-    for i in range(len(left_ventricle_centers)):
+    for i in range(len(left_center_points)):
         closest_points_ln.append(
-            get_closest_point_to_line(left_ventricle_centers[i], right_ventricle_centers[i], dia_ln_contours[i]))
-    for i in range(len(left_ventricle_centers)):
+            get_closest_point_to_line(left_center_points[i], right_center_points[i], ln_contours[i]))
+    for i in range(len(left_center_points)):
         closest_points_lp.append(
-            get_closest_point_to_line(left_ventricle_centers[i], right_ventricle_centers[i], dia_lp_contours[i]))
+            get_closest_point_to_line(left_center_points[i], right_center_points[i], lp_contours[i]))
 
-    for i in range(len(left_ventricle_centers)):
-        wall_thicknesses.append(get_array_len(closest_points_ln[i] - closest_points_lp[i]))
+    for i in range(len(left_center_points)):
+        wall_thicknesses_by_region.append(get_array_len(closest_points_ln[i] - closest_points_lp[i]))
+
+    return wall_thicknesses_by_region
+
+
+def get_wall_thicknesses(dia_ln_contours, dia_lp_contours, dia_rn_contours):
+    wall_thicknesses = []
+    right_center_points_for_septal = []
+    left_center_points = []
+    for right_ventricle_contour in dia_rn_contours:
+        center_x, center_y = get_center(right_ventricle_contour)
+        right_center_points_for_septal.append([center_x, center_y])
+    for left_ventricle_contour in dia_ln_contours:
+        center_x, center_y = get_center(left_ventricle_contour)
+        left_center_points.append([center_x, center_y])
+
+    wall_thicknesses.append(
+        get_wall_thicknesses_by_region(left_center_points, right_center_points_for_septal,
+                                       dia_ln_contours, dia_lp_contours))
+
+    # anterior region
+    wall_thicknesses.append(
+        rotate_right_center_and_get_wall_thicknesses(left_center_points, right_center_points_for_septal,
+                                                     dia_ln_contours,
+                                                     dia_lp_contours, 90))
+
+    # lateral region
+    wall_thicknesses.append(
+        rotate_right_center_and_get_wall_thicknesses(left_center_points, right_center_points_for_septal,
+                                                     dia_ln_contours,
+                                                     dia_lp_contours, 180))
+
+    # inferior region
+    wall_thicknesses.append(
+        rotate_right_center_and_get_wall_thicknesses(left_center_points, right_center_points_for_septal,
+                                                     dia_ln_contours,
+                                                     dia_lp_contours, 270))
 
     return wall_thicknesses
 

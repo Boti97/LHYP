@@ -2,6 +2,16 @@ import numpy as np
 import math
 
 
+def rotate_point_around_point(point_to_rotate, point_to_rotate_around, angle):
+    point_to_rotate[0] = math.cos(angle) * (point_to_rotate[0] - point_to_rotate_around[0]) - math.sin(angle) * (
+                point_to_rotate[1] - point_to_rotate_around[1]) + point_to_rotate_around[0]
+
+    point_to_rotate[1] = math.sin(angle) * (point_to_rotate[0] - point_to_rotate_around[0]) + math.cos(angle) * (
+                point_to_rotate[1] - point_to_rotate_around[1]) + point_to_rotate_around[1]
+
+    return [point_to_rotate[0], point_to_rotate[1]]
+
+
 def get_center(contour):
     number_of_points = len(contour)
     x_sum = 0
@@ -36,6 +46,7 @@ def get_contour_area(contour):
             contour_area += get_triangle_area(a, b, c)
     return contour_area
 
+
 def get_array_len(array):
     return math.sqrt(abs(array[0]) ** 2 + abs(array[1]) ** 2)
 
@@ -57,13 +68,14 @@ def get_closest_point_to_line(point_a, point_b, contour):
     max_tilt_angle = 0
 
     for contour_point in contour:
-        c_array = np.array(contour_point[0], contour_point[1])
+        c_array = np.array([contour_point[0], contour_point[1]])
         array_a_c = a_array - c_array
         array_b_c = b_array - c_array
 
         tilt_angle = get_tilt_angle(array_a_c, array_b_c)
         if tilt_angle > max_tilt_angle:
             closest_point = contour_point
+            max_tilt_angle = tilt_angle
 
     return closest_point
 
