@@ -79,9 +79,3 @@ def get_closest_point_to_line(point_a, point_b, contour):
 
     return closest_point
 
-
-'''
-a = np.array([(-3), 4])
-b = np.array([6, 2.5])
-c = get_tilt_angle(a, b)
-'''

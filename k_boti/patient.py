@@ -148,15 +148,9 @@ def save_patient_to_pickle(patient, output_path):
 
 
 def create_patient_pickles():
-    '''
-    print("Root directory path:")
-    root_directory = input()
-    print("Output pickle files' directory path:")
-    output_path = input()
-    '''
 
-    root_directory = 'C:/MyLife/School/MSc/8.felev/sample'
-    output_path = 'C:/MyLife/School/MSc/8.felev/Onlab/k_boti/pickles'
+    root_directory = "C:/MyLife/School/MSc/8.felev/sample"
+    output_path = "C:/MyLife/School/MSc/8.felev/Onlab/k_boti/pickles"
 
     global start_time
     start_time = time.time()
