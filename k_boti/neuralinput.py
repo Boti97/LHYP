@@ -13,6 +13,7 @@ class NeuralInput:
     def __init__(self, patient):
         self.wall_thicknesses = get_wall_thicknesses(patient.dia_ln_contours, patient.dia_lp_contours,
                                                      patient.dia_rn_contours)
+        self.diagnosis = patient.diagnosis
 
 
 def rotate_right_center_and_get_wall_thicknesses(left_center_points, right_center_points, dia_ln_contours, dia_lp_contours, angle):
@@ -96,16 +97,20 @@ def read_patient_pickle():
     return patients
 
 
-def process_patient_files(patients):
+def process_patient_files():
+    patients = read_patient_pickle()
     neural_inputs = []
     for patient in patients:
-        neural_inputs = NeuralInput(patient)
+        neural_inputs .append(NeuralInput(patient))
     return neural_inputs
 
 
 def main():
     patients = read_patient_pickle()
-    neural_inputs = process_patient_files(patients)
+    neural_inputs = []
+    for patient in patients:
+        neural_inputs = NeuralInput(patient)
+    return neural_inputs
 
 
 if __name__ == '__main__':

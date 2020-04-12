@@ -36,6 +36,7 @@ class Patient:
         self.Patient_gender = contour_reader.volume_data["Patient_gender="]
 
 
+
 def get_all_necessary_contours_by_frame(contours, frame):
     dia_ln_contours = []
     dia_lp_contours = []
@@ -147,6 +148,11 @@ def save_patient_to_pickle(patient, output_path):
         pickle.dump(patient, output)
 
 
+def get_diagnosis_from_meta(meta_file):
+    with open(meta_file, encoding="utf-8") as meta:
+        return meta.readline().split(" ")[1]
+
+
 def create_patient_pickles():
 
     root_directory = "C:/MyLife/School/MSc/8.felev/sample"
@@ -159,9 +165,11 @@ def create_patient_pickles():
     for folder in patient_list:
         image_folder = root_directory + "/" + folder + "/sa/images"
         con_file = root_directory + "/" + folder + "/sa/contours.con"
+        meta_file = root_directory + "/" + folder + "/meta.txt"
         cr = CONreaderVM(con_file)
         try:
             patient = Patient(cr)
+            patient.diagnosis = get_diagnosis_from_meta(meta_file)
             save_patient_to_pickle(patient, output_path)
         except ContourFileError as err:
             print(err)

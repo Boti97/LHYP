@@ -372,6 +372,11 @@ def save_patient_to_pickle(patient, output_path):
         pickle.dump(patient, output)
 
 
+def get_diagnosis_from_meta(meta_file):
+    with open(meta_file, encoding="utf-8") as meta:
+        return meta.readline().split(" ")[1]
+
+
 def create_patient_pickles(root_directory, output_path):
 
     global start_time
@@ -381,9 +386,11 @@ def create_patient_pickles(root_directory, output_path):
     for folder in patient_list:
         image_folder = root_directory + "/" + folder + "/sa/images"
         con_file = root_directory + "/" + folder + "/sa/contours.con"
+        meta_file = root_directory + "/" + folder + "/meta.txt"
         cr = CONreaderVM(con_file)
         try:
             patient = Patient(cr)
+            patient.diagnosis = get_diagnosis_from_meta(meta_file)
             save_patient_to_pickle(patient, output_path)
         except ContourFileError as err:
             print(err)
