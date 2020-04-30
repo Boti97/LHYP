@@ -274,7 +274,7 @@ def get_all_necessary_contours_by_frame(contours, frame):
     return dia_ln_contours, dia_lp_contours, dia_rn_contours
 
 
-#not used
+# not used
 def simplify_contours(contours):
     cont_list = []
     for slc in contours:
@@ -305,19 +305,21 @@ def get_frames_and_contours(contours):
                 if has_lp and "lp" not in contours[slc][con_frame]:
                     has_lp = False
             if has_ln:
+                cont_list.clear()
                 max_frames_in_slc = len(contours[slc])
                 frames = simplify_slc_frm_list(contours[slc], slc)
                 for sl, frm in frames:
                     cont_list.append(contours[slc][frm]["ln"])
             elif has_lp:
+                cont_list.clear()
                 max_frames_in_slc = len(contours[slc])
-                frames = simplify_slc_frm_list(contours[slc])
+                frames = simplify_slc_frm_list(contours[slc], slc)
                 for sl, frm in frames:
                     cont_list.append(contours[slc][frm]["lp"])
     return frames, cont_list
 
 
-#not used
+# not used
 def get_contours_by_positions_and_mode(contours, positions, mode):
     spec_contours = []
     for pos in positions:
@@ -326,7 +328,7 @@ def get_contours_by_positions_and_mode(contours, positions, mode):
     return spec_contours
 
 
-#not used
+# not used
 def get_sub_lists(original_list, number_of_sub_list_wanted):
     sub_lists = list()
     for sub_list_count in range(number_of_sub_list_wanted):
@@ -350,7 +352,7 @@ def get_diastole_and_systole_frame(frame_list, cont_list):
     return diastole_frame, systole_frame
 
 
-#not used
+# not used
 def get_images_by_position(dicom, positioins):
     pos_1 = positioins[0]
     pos_2 = positioins[1]
@@ -378,27 +380,23 @@ def get_diagnosis_from_meta(meta_file):
 
 
 def create_patient_pickles(root_directory, output_path):
-
     global start_time
     start_time = time.time()
 
     patient_list = os.listdir(root_directory)
     for folder in patient_list:
-        image_folder = root_directory + "/" + folder + "/sa/images"
         con_file = root_directory + "/" + folder + "/sa/contours.con"
         meta_file = root_directory + "/" + folder + "/meta.txt"
-        cr = CONreaderVM(con_file)
-        try:
-            patient = Patient(cr)
-            patient.diagnosis = get_diagnosis_from_meta(meta_file)
-            save_patient_to_pickle(patient, output_path)
-        except ContourFileError as err:
-            print(err)
+
+        if os.path.isfile(con_file):
+            cr = CONreaderVM(con_file)
+            try:
+                patient = Patient(cr)
+                patient.diagnosis = get_diagnosis_from_meta(meta_file)
+                save_patient_to_pickle(patient, output_path)
+            except ContourFileError as err:
+                print(err)
+        else:
+            print("Contour file does not exist for patient - " + folder)
 
     print(time.time() - start_time)
-
-
-
-
-
-

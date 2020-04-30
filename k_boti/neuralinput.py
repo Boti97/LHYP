@@ -1,6 +1,6 @@
 import os
 
-from geometry import get_center, get_closest_point_to_line, get_array_len, rotate_point_around_point
+from geometry import get_center, get_closest_point_to_line, get_array_len, rotate_point_around_point, get_line_length
 from patient import Patient
 
 try:
@@ -11,18 +11,28 @@ except ModuleNotFoundError:
 
 class NeuralInput:
     def __init__(self, patient):
-        self.wall_thicknesses = get_wall_thicknesses(patient.dia_ln_contours, patient.dia_lp_contours,
-                                                     patient.dia_rn_contours)
+        self.wall_thicknesses, self.ln_polygons, self.lp_polygons, self.distances = get_wall_thicknesses(
+            patient.dia_ln_contours,
+            patient.dia_lp_contours,
+            patient.dia_rn_contours)
         self.diagnosis = patient.diagnosis
 
 
-def rotate_right_center_and_get_wall_thicknesses(left_center_points, right_center_points, dia_ln_contours, dia_lp_contours, angle):
+def rotate_right_center_and_get_wall_thicknesses(left_center_points, right_center_points, dia_ln_contours,
+                                                 dia_lp_contours, angle):
     right_center_points_for_region = []
-    for i in range(len(right_center_points)):
-        right_center_points_for_region.append(
-            rotate_point_around_point(right_center_points[i], left_center_points[i], angle))
+    if angle > 0:
+        for i in range(len(right_center_points)):
+            right_center_points_for_region.append(
+                rotate_point_around_point(right_center_points[i], left_center_points[i], angle))
+    else:
+        right_center_points_for_region = right_center_points
 
-    return get_wall_thicknesses_by_region(left_center_points, right_center_points_for_region,dia_ln_contours, dia_lp_contours)
+    wall_thicknesses_by_region, closest_points_ln, closest_points_lp = get_wall_thicknesses_by_region(
+        left_center_points, right_center_points_for_region, dia_ln_contours,
+        dia_lp_contours)
+
+    return wall_thicknesses_by_region, closest_points_ln, closest_points_lp
 
 
 def get_wall_thicknesses_by_region(left_center_points, right_center_points, ln_contours, lp_contours):
@@ -40,7 +50,24 @@ def get_wall_thicknesses_by_region(left_center_points, right_center_points, ln_c
     for i in range(len(left_center_points)):
         wall_thicknesses_by_region.append(get_array_len(closest_points_ln[i] - closest_points_lp[i]))
 
-    return wall_thicknesses_by_region
+    return wall_thicknesses_by_region, closest_points_ln, closest_points_lp
+
+
+def get_polygons_from_closest_point(septal_closest_points, anterior_closest_points, lateral_closest_points,
+                                    inferior_closest_points):
+    polygons = []
+    for i in range(len(septal_closest_points)):
+        polygons.append([septal_closest_points[i], anterior_closest_points[i], lateral_closest_points[i],
+                         inferior_closest_points[i]])
+    return polygons
+
+
+def get_distances_between_opposite_points(closest_points_a, closest_points_b):
+    distances = []
+    for i in range(len(closest_points_a)):
+        distances.append(get_line_length(closest_points_a[i], closest_points_b[i]))
+
+    return distances
 
 
 def get_wall_thicknesses(dia_ln_contours, dia_lp_contours, dia_rn_contours):
@@ -54,29 +81,50 @@ def get_wall_thicknesses(dia_ln_contours, dia_lp_contours, dia_rn_contours):
         center_x, center_y = get_center(left_ventricle_contour)
         left_center_points.append([center_x, center_y])
 
-    wall_thicknesses.append(
-        get_wall_thicknesses_by_region(left_center_points, right_center_points_for_septal,
-                                       dia_ln_contours, dia_lp_contours))
+    # apical septal region
+    septal_wall_thicknesses, septal_closest_points_ln, septal_closest_points_lp = rotate_right_center_and_get_wall_thicknesses(
+        left_center_points, right_center_points_for_septal,
+        dia_ln_contours,
+        dia_lp_contours, 0)
 
-    # anterior region
-    wall_thicknesses.append(
-        rotate_right_center_and_get_wall_thicknesses(left_center_points, right_center_points_for_septal,
-                                                     dia_ln_contours,
-                                                     dia_lp_contours, 90))
+    wall_thicknesses.append(septal_wall_thicknesses)
 
-    # lateral region
-    wall_thicknesses.append(
-        rotate_right_center_and_get_wall_thicknesses(left_center_points, right_center_points_for_septal,
-                                                     dia_ln_contours,
-                                                     dia_lp_contours, 180))
+    # apical anterior region
+    anterior_wall_thicknesses, anterior_closest_points_ln, anterior_closest_points_lp = rotate_right_center_and_get_wall_thicknesses(
+        left_center_points, right_center_points_for_septal,
+        dia_ln_contours,
+        dia_lp_contours, 90)
 
-    # inferior region
-    wall_thicknesses.append(
-        rotate_right_center_and_get_wall_thicknesses(left_center_points, right_center_points_for_septal,
-                                                     dia_ln_contours,
-                                                     dia_lp_contours, 270))
+    wall_thicknesses.append(anterior_wall_thicknesses)
 
-    return wall_thicknesses
+    # apical lateral region
+    lateral_wall_thicknesses, lateral_closest_points_ln, lateral_closest_points_lp = rotate_right_center_and_get_wall_thicknesses(
+        left_center_points, right_center_points_for_septal,
+        dia_ln_contours,
+        dia_lp_contours, 180)
+
+    wall_thicknesses.append(lateral_wall_thicknesses)
+
+    # apical inferior region
+    inferior_wall_thicknesses, inferior_closest_points_ln, inferior_closest_points_lp = rotate_right_center_and_get_wall_thicknesses(
+        left_center_points, right_center_points_for_septal,
+        dia_ln_contours,
+        dia_lp_contours, 270)
+
+    wall_thicknesses.append(inferior_wall_thicknesses)
+
+    # create polygons from points found in the different regions
+    polygons_for_slices_ln = get_polygons_from_closest_point(septal_closest_points_ln, anterior_closest_points_ln,
+                                                             lateral_closest_points_ln, inferior_closest_points_ln)
+
+    polygons_for_slices_lp = get_polygons_from_closest_point(septal_closest_points_lp, anterior_closest_points_lp,
+                                                             lateral_closest_points_lp, inferior_closest_points_lp)
+
+    distances_between_opposite_points = [
+        get_distances_between_opposite_points(anterior_closest_points_ln, inferior_closest_points_ln),
+        get_distances_between_opposite_points(septal_closest_points_ln, lateral_closest_points_ln)]
+
+    return wall_thicknesses, polygons_for_slices_ln, polygons_for_slices_lp, distances_between_opposite_points
 
 
 def read_patient_pickle():
@@ -101,7 +149,7 @@ def process_patient_files():
     patients = read_patient_pickle()
     neural_inputs = []
     for patient in patients:
-        neural_inputs .append(NeuralInput(patient))
+        neural_inputs.append(NeuralInput(patient))
     return neural_inputs
 
 

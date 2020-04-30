@@ -54,11 +54,8 @@ def get_array_len(array):
 def get_tilt_angle(a_array, b_array):
     a_array_len = get_array_len(a_array)
     b_array_len = get_array_len(b_array)
-    x = (a_array[0]*b_array[0] + a_array[1]*b_array[1])
-    z = (a_array_len*b_array_len)
-    y = ((a_array[0]*b_array[0] + (a_array[1]*b_array[1]))/(a_array_len*b_array_len))
-
-    return math.degrees(math.acos((a_array[0]*b_array[0] + (a_array[1]*b_array[1]))/(a_array_len*b_array_len)))
+    angle_rad = ((a_array[0]*b_array[0] + (a_array[1]*b_array[1]))/(a_array_len*b_array_len))
+    return math.degrees(math.acos(angle_rad))
 
 
 def get_closest_point_to_line(point_a, point_b, contour):
@@ -71,8 +68,10 @@ def get_closest_point_to_line(point_a, point_b, contour):
         c_array = np.array([contour_point[0], contour_point[1]])
         array_a_c = a_array - c_array
         array_b_c = b_array - c_array
+        tilt_angles = []
 
         tilt_angle = get_tilt_angle(array_a_c, array_b_c)
+        tilt_angles.append(tilt_angle)
         if tilt_angle > max_tilt_angle:
             closest_point = contour_point
             max_tilt_angle = tilt_angle
