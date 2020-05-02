@@ -53,12 +53,12 @@ def get_trimmed_wall_thicknesses(all_wall_thicknesses, min_wall_thickness_number
 
 def get_minimum_wall_thickness_number_and_all_wall_thicknesses(patients):
     all_wall_thicknesses = []
-    min_wall_thickness_number = 1000
+    min_wall_thickness_list_length = 1000
     for patient in patients:
-        if len(patient.wall_thicknesses[0]) < min_wall_thickness_number:
-            min_wall_thickness_number = len(patient.wall_thicknesses[0])
+        if len(patient.wall_thicknesses[0]) < min_wall_thickness_list_length:
+            min_wall_thickness_list_length = len(patient.wall_thicknesses[0])
         all_wall_thicknesses.append(patient.wall_thicknesses)
-    return min_wall_thickness_number, all_wall_thicknesses
+    return min_wall_thickness_list_length, all_wall_thicknesses
 
 
 def get_all_diagnoses(patients):
@@ -69,52 +69,54 @@ def get_all_diagnoses(patients):
 
 
 def diagnoses_converter(all_diagnoses):
-    category_dir ={
+    category_dir = {
         'HCM': 0,
         'Normal': 1,
         'U18_m': 2,
         'U18_f': 3,
-        'Aortastenosis': 4
+        'Aortastenosis': 4,
+        'AMY': 5,
+        'Other': 6
     }
     diagnoses_converted = []
     for diagnoses in all_diagnoses:
         if diagnoses in category_dir:
             diagnoses_converted.append(category_dir[diagnoses])
         else:
-            diagnoses_converted.append(0)
+            diagnoses_converted.append(6)
     return diagnoses_converted
 
 
 def main():
     patients = process_patient_files()
 
-    min_wall_thickness_number, all_wall_thicknesses = get_minimum_wall_thickness_number_and_all_wall_thicknesses(
+    min_wall_thickness_list_length, all_wall_thicknesses = get_minimum_wall_thickness_number_and_all_wall_thicknesses(
         patients)
 
-    all_data_X = torch.Tensor(get_trimmed_wall_thicknesses(all_wall_thicknesses, min_wall_thickness_number))
-    all_data_Y = torch.Tensor(diagnoses_converter(get_all_diagnoses(patients))).type(torch.int64)
-    train_X = all_data_X[:int(len(all_data_X)*0.6)]
-    test_X = all_data_X[int(len(all_data_X)*0.6):]
-    train_Y = all_data_Y[:int(len(all_data_X)*0.6)]
-    test_Y = all_data_Y[int(len(all_data_X)*0.6):]
+    all_data_x = torch.Tensor(get_trimmed_wall_thicknesses(all_wall_thicknesses, min_wall_thickness_list_length))
+    all_data_y = torch.Tensor(diagnoses_converter(get_all_diagnoses(patients))).type(torch.int64)
+    train_x = all_data_x[:int(len(all_data_x) * 0.6)]
+    test_x = all_data_x[int(len(all_data_x) * 0.6):]
+    train_y = all_data_y[:int(len(all_data_x) * 0.6)]
+    test_y = all_data_y[int(len(all_data_x) * 0.6):]
 
-    #flattening
-    train_X = train_X.view(-1, 4 * 9).squeeze(1)
-    test_X = test_X.view(-1, 4 * 9).squeeze(1)
+    # flattening
+    train_x = train_x.view(-1, 4 * 9).squeeze(1)
+    test_x = test_x.view(-1, 4 * 9).squeeze(1)
 
-    all_idx = np.arange(len(train_X))
+    all_idx = np.arange(len(train_x))
     train_idx = all_idx[:15]
     dev_idx = all_idx[15:]
-    dev_X = train_X[dev_idx]
-    dev_y = train_Y[dev_idx]
-    train_X = train_X[train_idx]
-    train_y = train_Y[train_idx]
-    print("Train size:", train_X.size(), train_y.size())
-    print("Dev size:", dev_X.size(), dev_y.size())
-    print("Test size:", test_X.size(), train_Y.size())
+    dev_x = train_x[dev_idx]
+    dev_y = train_y[dev_idx]
+    train_x = train_x[train_idx]
+    train_y = train_y[train_idx]
+    print("Train size:", train_x.size(), train_y.size())
+    print("Dev size:", dev_x.size(), dev_y.size())
+    print("Test size:", test_x.size(), train_y.size())
 
     model = SimpleClassifier(
-        input_dim=train_X.size(1),
+        input_dim=train_x.size(1),
         output_dim=5,
         hidden_dim=50
     )
@@ -123,9 +125,9 @@ def main():
     optimizer = optim.Adam(model.parameters())
 
     batch_size = 10
-    train_iter = BatchedIterator(train_X, train_y, batch_size)
-    dev_iter = BatchedIterator(dev_X, dev_y, batch_size)
-    test_iter = BatchedIterator(test_X, test_Y, batch_size)
+    train_iter = BatchedIterator(train_x, train_y, batch_size)
+    dev_iter = BatchedIterator(dev_x, dev_y, batch_size)
+    test_iter = BatchedIterator(test_x, test_y, batch_size)
 
     all_train_loss = []
     all_dev_loss = []
@@ -142,27 +144,26 @@ def main():
             optimizer.step()
 
         # one train epoch finished, evaluate on the train and the dev set (NOT the test)
-        train_out = model(train_X)
+        train_out = model(train_x)
         train_loss = criterion(train_out, train_y)
         all_train_loss.append(train_loss.item())
         train_pred = train_out.max(axis=1)[1]
-        train_acc = torch.eq(train_pred, train_y).sum().float() / len(train_X)
+        train_acc = torch.eq(train_pred, train_y).sum().float() / len(train_x)
         all_train_acc.append(train_acc)
 
-        dev_out = model(dev_X)
+        dev_out = model(dev_x)
         dev_loss = criterion(dev_out, dev_y)
         all_dev_loss.append(dev_loss.item())
         dev_pred = dev_out.max(axis=1)[1]
-        dev_acc = torch.eq(dev_pred, dev_y).sum().float() / len(dev_X)
+        dev_acc = torch.eq(dev_pred, dev_y).sum().float() / len(dev_x)
         all_dev_acc.append(dev_acc)
 
         print(f"Epoch: {epoch}\n  train accuracy: {train_acc}  train loss: {train_loss}")
         print(f"  dev accuracy: {dev_acc}  dev loss: {dev_loss}")
 
-    test_pred = model(test_X).max(axis=1)[1]
-    test_acc = torch.eq(test_pred, test_Y).sum().float() / len(test_X)
+    test_pred = model(test_x).max(axis=1)[1]
+    test_acc = torch.eq(test_pred, test_y).sum().float() / len(test_x)
     test_acc
 
 
 main()
-

@@ -47,6 +47,8 @@ def get_all_necessary_contours_by_frame(contours, frame):
             dia_lp_contours.append(contours[slc][frame]["lp"])
             dia_rn_contours.append(contours[slc][frame]["rn"])
 
+    if dia_ln_contours.__len__() == 0 or dia_lp_contours.__len__() == 0 or dia_rn_contours.__len__() == 0:
+        raise ContourFileError("There's no ln, lp, and rn in frame: " + str(frame))
     return dia_ln_contours, dia_lp_contours, dia_rn_contours
 
 
@@ -92,6 +94,8 @@ def get_frames_and_contours(contours):
                 frames = simplify_slc_frm_list(contours[slc], slc)
                 for sl, frm in frames:
                     cont_list.append(contours[slc][frm]["lp"])
+    if frames.__len__() == 0:
+        raise ContourFileError("Unable to locate diastoly and systoly.")
     return frames, cont_list
 
 
@@ -117,6 +121,7 @@ def get_diastole_and_systole_frame(frame_list, cont_list):
     diastole_frame = None
     systole_cont = None
     systole_frame = None
+
     for i, cont in enumerate(cont_list):
         cont_area = get_contour_area(cont)
         if diastole_cont is None or diastole_cont < cont_area:

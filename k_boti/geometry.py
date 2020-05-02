@@ -1,15 +1,21 @@
 import numpy as np
 import math
+import matplotlib.pyplot as plt
 
 
 def rotate_point_around_point(point_to_rotate, point_to_rotate_around, angle):
-    point_to_rotate[0] = math.cos(angle) * (point_to_rotate[0] - point_to_rotate_around[0]) - math.sin(angle) * (
-                point_to_rotate[1] - point_to_rotate_around[1]) + point_to_rotate_around[0]
+    sin_angle = round(math.sin(math.radians(angle)))
+    cos_angle = round(math.cos(math.radians(angle)))
 
-    point_to_rotate[1] = math.sin(angle) * (point_to_rotate[0] - point_to_rotate_around[0]) + math.cos(angle) * (
-                point_to_rotate[1] - point_to_rotate_around[1]) + point_to_rotate_around[1]
+    new_point_x = point_to_rotate[0] - point_to_rotate_around[0]
+    new_point_y = point_to_rotate[1] - point_to_rotate_around[1]
 
-    return [point_to_rotate[0], point_to_rotate[1]]
+    new_point_x = new_point_x * cos_angle - new_point_y * sin_angle
+    new_point_y = new_point_x * sin_angle + new_point_y * cos_angle
+
+    new_point_x += point_to_rotate_around[0]
+    new_point_y += point_to_rotate_around[1]
+    return [new_point_x, new_point_y]
 
 
 def get_center(contour):
@@ -58,10 +64,18 @@ def get_tilt_angle(a_array, b_array):
     return math.degrees(math.acos(angle_rad))
 
 
+def move_away_point_from_another_point_on_line(point_a, point_b, unit_to_move):
+    distance = get_line_length(point_a, point_b)
+    point_c_x = point_a[0] + (unit_to_move/distance) * (point_b[0] - point_a[0])
+    point_c_y = point_a[1] + (unit_to_move/distance) * (point_b[1] - point_a[1])
+    return [point_c_x, point_c_y]
+
+
 def get_closest_point_to_line(point_a, point_b, contour):
     closest_point = [0, 0]
+    point_c = move_away_point_from_another_point_on_line(point_a, point_b, 100)
     a_array = np.array([point_a[0], point_a[1]])
-    b_array = np.array([point_b[0], point_b[1]])
+    b_array = np.array([point_c[0], point_c[1]])
     max_tilt_angle = 0
 
     for contour_point in contour:
