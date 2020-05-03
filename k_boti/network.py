@@ -6,7 +6,6 @@ from patient import Patient
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import time
 from neuralinput import process_patient_files
 
 
@@ -68,6 +67,17 @@ def get_all_diagnoses(patients):
     return all_diagnoses
 
 
+def get_all_distances(patients):
+    all_distances = []
+    min_length_of_list = 1000
+    for patient in patients:
+        for d in patient.distances:
+            if len(d) < min_length_of_list:
+                min_length_of_list = len(d)
+        all_distances.append(patient.distances)
+    return all_distances, min_length_of_list
+
+
 def diagnoses_converter(all_diagnoses):
     category_dir = {
         'HCM': 0,
@@ -87,26 +97,89 @@ def diagnoses_converter(all_diagnoses):
     return diagnoses_converted
 
 
+def get_trimmed_distances(all_distances, min_distance_list_length):
+    trimmed_distances = []
+    for distances in all_distances:
+        patient_distances = []
+        for w in distances:
+            if len(w) > min_distance_list_length:
+                patient_distances.append(w[:min_distance_list_length])
+            else:
+                patient_distances.append(w)
+
+        trimmed_distances.append(patient_distances)
+    return trimmed_distances
+
+
+def get_trimmed_polygons(all_polygons, min_length_of_list):
+    trimmed_polygons = []
+    for polygon in all_polygons:
+        if len(polygon) > min_length_of_list:
+            trimmed_polygons.append(polygon[:min_length_of_list])
+        else:
+            trimmed_polygons.append(polygon)
+    return trimmed_polygons
+
+
+def get_all_polygons_as_tensor(patients):
+    all_polygons_ln = []
+    all_polygons_lp = []
+    min_length_of_list_ln = 1000
+    min_length_of_list_lp = 1000
+    for patient in patients:
+        if len(patient.ln_polygons) < min_length_of_list_ln:
+            min_length_of_list_ln = len(patient.ln_polygons)
+        if len(patient.lp_polygons) < min_length_of_list_lp:
+            min_length_of_list_lp = len(patient.lp_polygons)
+        all_polygons_ln.append(patient.ln_polygons)
+        all_polygons_lp.append(patient.lp_polygons)
+
+    if min_length_of_list_ln > min_length_of_list_lp:
+        min_length_of_list_ln = min_length_of_list_lp
+    else:
+        min_length_of_list_lp = min_length_of_list_ln
+    all_polygons_ln_trimmed = get_trimmed_polygons(all_polygons_ln, min_length_of_list_ln)
+    all_polygons_lp_trimmed = get_trimmed_polygons(all_polygons_lp, min_length_of_list_lp)
+
+    all_polygons_ln_tensor = torch.Tensor(all_polygons_ln_trimmed)
+    all_polygons_lp_tensor = torch.Tensor(all_polygons_lp_trimmed)
+
+    trimmed_polygons_ln = all_polygons_ln_tensor.view(-1, min_length_of_list_ln * 4 * 2).squeeze(1)
+    trimmed_polygons_lp = all_polygons_lp_tensor.view(-1, min_length_of_list_lp * 4 * 2).squeeze(1)
+
+    all_trimmed_polygons = torch.cat((trimmed_polygons_ln, trimmed_polygons_lp), 1)
+
+    return all_trimmed_polygons
+
+
 def main():
     patients = process_patient_files()
 
-    min_wall_thickness_list_length, all_wall_thicknesses = get_minimum_wall_thickness_number_and_all_wall_thicknesses(
-        patients)
+    min_wall_thickness_list_length, all_wall_thicknesses = get_minimum_wall_thickness_number_and_all_wall_thicknesses(patients)
+
+    all_distances, min_distance_list_length = get_all_distances(patients)
+    all_polygons = get_all_polygons_as_tensor(patients)
+
+    trimmed_distances = torch.Tensor(get_trimmed_distances(all_distances, min_distance_list_length))
 
     all_data_x = torch.Tensor(get_trimmed_wall_thicknesses(all_wall_thicknesses, min_wall_thickness_list_length))
     all_data_y = torch.Tensor(diagnoses_converter(get_all_diagnoses(patients))).type(torch.int64)
-    train_x = all_data_x[:int(len(all_data_x) * 0.6)]
-    test_x = all_data_x[int(len(all_data_x) * 0.6):]
-    train_y = all_data_y[:int(len(all_data_x) * 0.6)]
-    test_y = all_data_y[int(len(all_data_x) * 0.6):]
 
     # flattening
-    train_x = train_x.view(-1, 4 * 9).squeeze(1)
-    test_x = test_x.view(-1, 4 * 9).squeeze(1)
+    trimmed_distances = trimmed_distances.view(-1, 2 * min_distance_list_length).squeeze(1)
+    all_data_x = all_data_x.view(-1, 4 * min_wall_thickness_list_length)
+
+    # concatenate all the available data to one tensor as the input
+    concat_all_data_x = torch.cat((trimmed_distances, all_data_x, all_polygons), 1)
+
+    train_x = concat_all_data_x[:int(len(concat_all_data_x) * 0.6)].type(torch.float32)
+    test_x = concat_all_data_x[int(len(concat_all_data_x) * 0.6):].type(torch.float32)
+    train_y = all_data_y[:int(len(all_data_y) * 0.6)].type(torch.int64)
+    test_y = all_data_y[int(len(all_data_y) * 0.6):].type(torch.int64)
 
     all_idx = np.arange(len(train_x))
-    train_idx = all_idx[:15]
-    dev_idx = all_idx[15:]
+    train_idx = all_idx[:round(len(all_idx) * 0.9)]
+    dev_idx = all_idx[round(len(all_idx) * 0.9):]
     dev_x = train_x[dev_idx]
     dev_y = train_y[dev_idx]
     train_x = train_x[train_idx]
@@ -117,7 +190,7 @@ def main():
 
     model = SimpleClassifier(
         input_dim=train_x.size(1),
-        output_dim=5,
+        output_dim=7,  # number of diagnoses
         hidden_dim=50
     )
 
@@ -163,7 +236,7 @@ def main():
 
     test_pred = model(test_x).max(axis=1)[1]
     test_acc = torch.eq(test_pred, test_y).sum().float() / len(test_x)
-    test_acc
+    print(test_acc)
 
 
 main()
