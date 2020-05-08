@@ -106,3 +106,16 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+k_boti/boti_data/
+k_boti/neural_input_pickles/
+k_boti/pickles/
+k_boti/data/FashionMNIST/
+k_boti/some.py
+example_usage.py
+.idea/.gitignore
+.idea/encodings.xml
+.idea/misc.xml
+.idea/modules.xml
+.idea/Onlab.iml
+.idea/vcs.xml
+.idea/inspectionProfiles/profiles_settings.xml

@@ -90,5 +90,28 @@ def get_closest_point_to_line(point_a, point_b, contour):
             closest_point = contour_point
             max_tilt_angle = tilt_angle
 
+    '''
+    if max_tilt_angle > 170:
+        x = []
+        y = []
+        for c in contour:
+            x.append(c[0])
+            y.append(c[1])
+
+        x.append(point_a[0])
+        x.append(point_b[0])
+        x.append(point_c[0])
+        y.append(point_a[1])
+        y.append(point_b[1])
+        y.append(point_c[1])
+        plt.scatter(x, y)
+
+        fig, ax = plt.subplots()
+        ax.set_xlim(0, 200)
+        ax.set_ylim(0, 200)
+
+        plt.show()
+'''
+
     return closest_point
 

@@ -1,7 +1,8 @@
 import os
+import time
 
 from geometry import get_center, get_closest_point_to_line, get_array_len, rotate_point_around_point, get_line_length
-from patient import Patient
+from patient import Patient, read_patient_pickle
 
 try:
     import cPickle as pickle
@@ -127,38 +128,44 @@ def get_wall_thicknesses(dia_ln_contours, dia_lp_contours, dia_rn_contours):
     return wall_thicknesses, polygons_for_slices_ln, polygons_for_slices_lp, distances_between_opposite_points
 
 
-def read_patient_pickle():
-    """
-    print("Pickles' directory path:")
-    pickles_images = input()
-    """
+def save_neural_input_to_pickle(neural_input, output_path):
+    millis = int(round(time.time() * 1000))
+    filename = "neural_input_" + str(millis) + ".pkl"
+    full_out_path = output_path + "/" + filename
 
-    pickles_images = 'C:/MyLife/School/MSc/8.felev/Onlab/k_boti/pickles'
-
-    pickle_list = os.listdir(pickles_images)
-    patients = []
-    for pickle_file in pickle_list:
-        full_out_path = pickles_images + "/" + pickle_file
-        with open(full_out_path, 'rb') as input_file:
-            patients.append(pickle.load(input_file))
-
-    return patients
+    with open(full_out_path, 'wb') as output:
+        pickle.dump(neural_input, output)
 
 
-def process_patient_files():
-    patients = read_patient_pickle()
+def read_neural_inputs_from_pickle(pickles_path):
+    pickle_list = os.listdir(pickles_path)
     neural_inputs = []
-    for patient in patients:
-        neural_inputs.append(NeuralInput(patient))
+    for pickle_file in pickle_list:
+        full_out_path = pickles_path + "/" + pickle_file
+        with open(full_out_path, 'rb') as input_file:
+            neural_inputs.append(pickle.load(input_file))
+
     return neural_inputs
+
+
+def process_patient_files(output_path, patient_pickles_path):
+    patients = read_patient_pickle(patient_pickles_path)
+    neural_inputs = []
+
+    for patient in patients:
+        neural_input = NeuralInput(patient)
+        neural_inputs.append(neural_input)
+        save_neural_input_to_pickle(neural_input, output_path)
+        if patient.study_id is not None:
+            print("Patient processed:" + patient.study_id)
+        else:
+            print("Patient processed: UNKNOWN")
 
 
 def main():
-    patients = read_patient_pickle()
-    neural_inputs = []
-    for patient in patients:
-        neural_inputs = NeuralInput(patient)
-    return neural_inputs
+    output_path = 'C:/MyLife/School/MSc/8.felev/Onlab/k_boti/neural_input_pickles'
+    patient_pickles_path = 'C:/MyLife/School/MSc/8.felev/Onlab/k_boti/pickles'
+    process_patient_files(output_path,patient_pickles_path)
 
 
 if __name__ == '__main__':

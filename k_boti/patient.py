@@ -3,6 +3,7 @@ from con_reader import CONreaderVM
 import time
 import numpy as np
 import os
+import matplotlib.pyplot as plt
 
 try:
     import cPickle as pickle
@@ -10,6 +11,7 @@ except ModuleNotFoundError:
     import pickle
 
 start_time = 0
+som = 0
 
 
 class ContourFileError(Exception):
@@ -122,6 +124,28 @@ def get_diastole_and_systole_frame(frame_list, cont_list):
     systole_cont = None
     systole_frame = None
 
+    '''
+    global som
+    if som > 0:
+        x = []
+        y = []
+        for c in cont_list[0]:
+            x.append(c[0])
+            y.append(c[1])
+
+        v = []
+        z = []
+        for c in cont_list[1]:
+            v.append(c[0])
+            z.append(c[1])
+
+        plt.scatter(x, y, color='red')
+        plt.scatter(v, z, color='green')
+        plt.show()
+
+    som += 1
+
+'''
     for i, cont in enumerate(cont_list):
         cont_area = get_contour_area(cont)
         if diastole_cont is None or diastole_cont < cont_area:
@@ -160,10 +184,18 @@ def get_diagnosis_from_meta(meta_file):
         return meta.readline().split(" ")[1]
 
 
-def create_patient_pickles():
-    root_directory = "C:/MyLife/School/MSc/8.felev/sample"
-    output_path = "C:/MyLife/School/MSc/8.felev/Onlab/k_boti/pickles"
+def read_patient_pickle(patient_pickles_path):
+    pickle_list = os.listdir(patient_pickles_path)
+    patients = []
+    for pickle_file in pickle_list:
+        full_out_path = patient_pickles_path + "/" + pickle_file
+        with open(full_out_path, 'rb') as input_file:
+            patients.append(pickle.load(input_file))
 
+    return patients
+
+
+def create_patient_pickles(root_directory, output_path):
     global start_time
     start_time = time.time()
 
@@ -187,7 +219,9 @@ def create_patient_pickles():
 
 
 def main():
-    create_patient_pickles()
+    root_directory = "C:/MyLife/School/MSc/8.felev/sample"
+    output_path = "C:/MyLife/School/MSc/8.felev/Onlab/k_boti/pickles"
+    create_patient_pickles(root_directory, output_path)
 
 
 if __name__ == '__main__':
