@@ -42,9 +42,12 @@ def get_wall_thicknesses(patients):
     all_wall_thicknesses = []
     min_wall_thickness_list_length = 1000
     for patient in patients:
-        if len(patient.wall_thicknesses[0]) < min_wall_thickness_list_length:
-            min_wall_thickness_list_length = len(patient.wall_thicknesses[0])
-        all_wall_thicknesses.append(patient.wall_thicknesses)
+        if len(patient.wall_thicknesses[0]) == 0:
+            print("Need to be deleted: " + patient.patiend_id)
+        else:
+            if len(patient.wall_thicknesses[0]) < min_wall_thickness_list_length:
+                min_wall_thickness_list_length = len(patient.wall_thicknesses[0])
+            all_wall_thicknesses.append(patient.wall_thicknesses)
 
     # trimming all the lists to the same length
     all_wall_thicknesses = torch.Tensor(
@@ -265,4 +268,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

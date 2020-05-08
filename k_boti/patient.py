@@ -171,12 +171,14 @@ def get_images_by_position(dicom, positioins):
 
 
 def save_patient_to_pickle(patient, output_path):
-    millis = int(round(time.time() * 1000))
-    filename = "patient_" + str(millis) + ".pkl"
-    full_out_path = output_path + "/" + filename
+    if patient.study_id is not None:
+        filename = "patient_" + patient.study_id + ".pkl"
+        full_out_path = output_path + "/" + filename
 
-    with open(full_out_path, 'wb') as output:
-        pickle.dump(patient, output)
+        with open(full_out_path, 'wb') as output:
+            pickle.dump(patient, output)
+    else:
+        print("Patient cannot be saved, because study_id is none!")
 
 
 def get_diagnosis_from_meta(meta_file):

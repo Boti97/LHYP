@@ -128,9 +128,8 @@ def get_wall_thicknesses(dia_ln_contours, dia_lp_contours, dia_rn_contours):
     return wall_thicknesses, polygons_for_slices_ln, polygons_for_slices_lp, distances_between_opposite_points
 
 
-def save_neural_input_to_pickle(neural_input, output_path):
-    millis = int(round(time.time() * 1000))
-    filename = "neural_input_" + str(millis) + ".pkl"
+def save_neural_input_to_pickle(neural_input, output_path, study_id):
+    filename = "neural_input_" + study_id + ".pkl"
     full_out_path = output_path + "/" + filename
 
     with open(full_out_path, 'wb') as output:
@@ -153,19 +152,19 @@ def process_patient_files(output_path, patient_pickles_path):
     neural_inputs = []
 
     for patient in patients:
-        neural_input = NeuralInput(patient)
-        neural_inputs.append(neural_input)
-        save_neural_input_to_pickle(neural_input, output_path)
         if patient.study_id is not None:
+            neural_input = NeuralInput(patient)
+            neural_inputs.append(neural_input)
+            save_neural_input_to_pickle(neural_input, output_path, patient.study_id)
             print("Patient processed:" + patient.study_id)
         else:
-            print("Patient processed: UNKNOWN")
+            print("Patient cannot be processed: study_id UNKNOWN")
 
 
 def main():
     output_path = 'C:/MyLife/School/MSc/8.felev/Onlab/k_boti/neural_input_pickles'
     patient_pickles_path = 'C:/MyLife/School/MSc/8.felev/Onlab/k_boti/pickles'
-    process_patient_files(output_path,patient_pickles_path)
+    process_patient_files(output_path, patient_pickles_path)
 
 
 if __name__ == '__main__':
