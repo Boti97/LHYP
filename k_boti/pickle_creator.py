@@ -8,8 +8,6 @@ try:
 except ModuleNotFoundError:
     import pickle
 
-start_time = 0
-
 
 logger = get_logger(__name__)
 
@@ -21,7 +19,6 @@ class ContourFileError(Exception):
 
 class Patient:
     def __init__(self, contour_reader):
-        print(time.time() - start_time)
         contours = contour_reader.get_hierarchical_contours()
 
         # separate diastole and systole by the first available frame
@@ -271,6 +268,8 @@ def get_all_necessary_contours_by_frame(contours, frame):
             dia_lp_contours.append(contours[slc][frame]["lp"])
             dia_rn_contours.append(contours[slc][frame]["rn"])
 
+    if dia_ln_contours.__len__() == 0 or dia_lp_contours.__len__() == 0 or dia_rn_contours.__len__() == 0:
+        raise ContourFileError("There's no ln, lp, and rn in frame: " + str(frame))
     return dia_ln_contours, dia_lp_contours, dia_rn_contours
 
 
@@ -316,6 +315,8 @@ def get_frames_and_contours(contours):
                 frames = simplify_slc_frm_list(contours[slc], slc)
                 for sl, frm in frames:
                     cont_list.append(contours[slc][frm]["lp"])
+    if frames.__len__() == 0:
+        raise ContourFileError("Unable to locate diastoly and systoly.")
     return frames, cont_list
 
 
@@ -366,12 +367,14 @@ def get_images_by_position(dicom, positioins):
 
 
 def save_patient_to_pickle(patient, output_path):
-    millis = int(round(time.time() * 1000))
-    filename = "patient_" + str(millis) + ".pkl"
-    full_out_path = output_path + "/" + filename
+    if patient.study_id is not None:
+        filename = "patient_" + patient.study_id + ".pkl"
+        full_out_path = output_path + "/" + filename
 
-    with open(full_out_path, 'wb') as output:
-        pickle.dump(patient, output)
+        with open(full_out_path, 'wb') as output:
+            pickle.dump(patient, output)
+    else:
+        print("Patient cannot be saved, because study_id is none!")
 
 
 def get_diagnosis_from_meta(meta_file):
@@ -379,10 +382,18 @@ def get_diagnosis_from_meta(meta_file):
         return meta.readline().split(" ")[1]
 
 
-def create_patient_pickles(root_directory, output_path):
-    global start_time
-    start_time = time.time()
+def read_patient_pickle(patient_pickles_path):
+    pickle_list = os.listdir(patient_pickles_path)
+    patients = []
+    for pickle_file in pickle_list:
+        full_out_path = patient_pickles_path + "/" + pickle_file
+        with open(full_out_path, 'rb') as input_file:
+            patients.append(pickle.load(input_file))
 
+    return patients
+
+
+def create_patient_pickles(root_directory, output_path):
     patient_list = os.listdir(root_directory)
     for folder in patient_list:
         con_file = root_directory + "/" + folder + "/sa/contours.con"
@@ -398,5 +409,3 @@ def create_patient_pickles(root_directory, output_path):
                 print(err)
         else:
             print("Contour file does not exist for patient - " + folder)
-
-    print(time.time() - start_time)
