@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets
+import torch.nn.functional as f
 
 from patient import Patient
 from neuralinput import NeuralInput
@@ -185,6 +186,9 @@ def train_neural_network(neural_inputs_pickles_path):
     # concat_all_data_x = torch.cat((distances, wall_thicknesses, polygons), 1)
     concat_all_data_x = wall_thicknesses
 
+    # normalize input
+    concat_all_data_x = f.normalize(concat_all_data_x)
+
     train_x = concat_all_data_x[:int(len(concat_all_data_x) * 0.6)].type(torch.float32)
     test_x = concat_all_data_x[int(len(concat_all_data_x) * 0.6):].type(torch.float32)
     train_y = all_data_y[:int(len(all_data_y) * 0.6)].type(torch.int64)
@@ -251,13 +255,14 @@ def train_neural_network(neural_inputs_pickles_path):
     test_acc = torch.eq(test_pred, test_y).sum().float() / len(test_x)
     print(test_acc)
 
-    plt.plot(all_train_loss, label='train')
-    plt.plot(all_dev_loss, label='dev')
-    plt.legend()
+    fig, (ax1, ax2) = plt.subplots(2)
+    ax1.plot(all_train_loss, label='train')
+    ax1.plot(all_dev_loss, label='dev')
+    ax1.legend()
 
-    plt.plot(all_train_acc, label='train')
-    plt.plot(all_dev_acc, label='dev')
-    plt.legend()
+    ax2.plot(all_train_acc, label='train')
+    ax2.plot(all_dev_acc, label='dev')
+    ax2.legend()
     plt.show()
 
 

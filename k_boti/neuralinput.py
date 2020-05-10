@@ -17,6 +17,7 @@ class NeuralInput:
             patient.dia_lp_contours,
             patient.dia_rn_contours)
         self.diagnosis = patient.diagnosis
+        self.study_id = patient.study_id.strip()
 
 
 def rotate_right_center_and_get_wall_thicknesses(left_center_points, right_center_points, dia_ln_contours,
@@ -149,16 +150,18 @@ def read_neural_inputs_from_pickle(pickles_path):
 
 def process_patient_files(output_path, patient_pickles_path):
     patients = read_patient_pickle(patient_pickles_path)
-    neural_inputs = []
 
     for patient in patients:
         if patient.study_id is not None:
             neural_input = NeuralInput(patient)
-            neural_inputs.append(neural_input)
-            save_neural_input_to_pickle(neural_input, output_path, patient.study_id)
-            print("Patient processed:" + patient.study_id)
+            if len(neural_input.wall_thicknesses) != 0 and len(neural_input.ln_polygons) != 0 and len(
+                    neural_input.lp_polygons) != 0 and len(neural_input.distances) != 0:
+                save_neural_input_to_pickle(neural_input, output_path, neural_input.study_id)
+                print("Patient processed:" + neural_input.study_id + '\n')
+            else:
+                print("Error during patient processing! One or more essential data is not filled.\n")
         else:
-            print("Patient cannot be processed: study_id UNKNOWN")
+            print("Patient cannot be processed: study_id UNKNOWN\n")
 
 
 def main():
