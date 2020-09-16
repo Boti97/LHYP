@@ -44,7 +44,7 @@ def get_wall_thicknesses_by_region(left_center_points, right_center_points, ln_c
 
     for i in range(len(left_center_points)):
         closest_points_ln.append(
-            get_closest_point_to_line(left_center_points[i], right_center_points[i], ln_contours[i]))
+            get_closest_point_to_line(left_center_points[i], right_center_points[i], ln_contours[i], lp_contours[i]))
     for i in range(len(left_center_points)):
         closest_points_lp.append(
             get_closest_point_to_line(left_center_points[i], right_center_points[i], lp_contours[i]))

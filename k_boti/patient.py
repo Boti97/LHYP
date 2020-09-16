@@ -221,7 +221,7 @@ def create_patient_pickles(root_directory, output_path):
 
 
 def main():
-    root_directory = "C:/MyLife/School/MSc/8.felev/sample"
+    root_directory = "C:/MyLife/School/MSc/8.felev/Onlab/sample"
     output_path = "C:/MyLife/School/MSc/8.felev/Onlab/k_boti/pickles"
     create_patient_pickles(root_directory, output_path)
 

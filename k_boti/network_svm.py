@@ -8,6 +8,7 @@ import torch.optim as optim
 import torch.nn.functional as torch_fun
 from neuralinput import process_patient_files, read_neural_inputs_from_pickle
 
+from sklearn import svm
 from neuralinput import NeuralInput
 
 
@@ -24,18 +25,9 @@ class BatchedIterator:
             yield self.X[start:end], self.y[start:end]
 
 
-class SimpleClassifier(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dim):
-        super().__init__()
-        self.input_layer = nn.Linear(input_dim, hidden_dim)
-        self.relu = nn.ReLU()
-        self.output_layer = nn.Linear(hidden_dim, output_dim)
-
-    def forward(self, X):
-        h = self.input_layer(X)
-        h = self.relu(h)
-        out = self.output_layer(h)
-        return out
+def my_loss(output, target):
+    loss = torch.mean((output - target)**2)
+    return loss
 
 
 def get_all_diagnoses(patients):
@@ -118,15 +110,16 @@ def get_polygons(patients):
 
 def diagnoses_converter(all_diagnoses):
     category_dir = {
-        'Normal': 0,
-        'Other': 1
+        'HCM': 0,
+        'Normal': 1,
+        'Other': 2
     }
     diagnoses_converted = []
     for diagnoses in all_diagnoses:
         if diagnoses in category_dir:
             diagnoses_converted.append(category_dir[diagnoses])
         else:
-            diagnoses_converted.append(1)
+            diagnoses_converted.append(2)
     occurence_count = Counter(diagnoses_converted)
     return diagnoses_converted
 
@@ -190,13 +183,13 @@ def train_neural_network(neural_inputs_pickles_path):
     all_data_y = torch.Tensor(diagnoses_converter(get_all_diagnoses(neural_inputs))).type(torch.int64)
 
     # concatenate all the available data to one tensor as the input
-    # concat_all_data_x = torch.cat((distances, wall_thicknesses, polygons), 1)
+    concat_all_data_x = torch.cat((distances, wall_thicknesses, polygons), 1)
 
     # concat_all_data_x = torch.cat((distances, polygons), 1)
     # concat_all_data_x = torch.cat((distances, wall_thicknesses), 1)
     # concat_all_data_x = torch.cat((polygons, wall_thicknesses), 1)
 
-    concat_all_data_x = distances
+    # concat_all_data_x = distances
     # concat_all_data_x = polygons
     # concat_all_data_x = wall_thicknesses
 
@@ -220,16 +213,12 @@ def train_neural_network(neural_inputs_pickles_path):
 
     print("Train size:", train_x.size(), train_y.size())
     print("Dev size:", dev_x.size(), dev_y.size())
-    print("Test size:", test_x.size(), train_y.size())
+    print("Test size:", test_x.size(), test_y.size())
 
-    model = SimpleClassifier(
-        input_dim=train_x.size(1),
-        output_dim=2,  # number of diagnoses
-        hidden_dim=50
-    )
+    model = svm.LinearSVR(C=1.0)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters())
+    # optimizer = optim.Adam(model.loss)
 
     batch_size = 20
     train_iter = BatchedIterator(train_x, train_y, batch_size)
@@ -239,35 +228,33 @@ def train_neural_network(neural_inputs_pickles_path):
     all_train_acc = []
     all_dev_acc = []
 
-    for epoch in range(300):
+    for epoch in range(200):
         # training loop
         for bi, (batch_x, batch_y) in enumerate(train_iter.iterate_once()):
-            y_out = model(batch_x)
-            loss = criterion(y_out, batch_y)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            y_out = model.fit(batch_x, batch_y)
+            # optimizer.zero_grad()
+            # optimizer.step()
 
         # one train epoch finished, evaluate on the train and the dev set (NOT the test)
-        train_out = model(train_x)
-        train_loss = criterion(train_out, train_y)
+        train_out = torch.Tensor(model.predict(train_x)).type(torch.float32)
+        train_loss = my_loss(train_out, train_y.type(torch.float32))
         all_train_loss.append(train_loss.item())
-        train_pred = train_out.max(axis=1)[1]
-        train_acc = torch.eq(train_pred, train_y).sum().float() / len(train_x)
+        train_pred = train_out
+        train_acc = torch.eq(train_pred, train_y.type(torch.float32)).sum().float() / len(train_x)
         all_train_acc.append(train_acc)
 
-        dev_out = model(dev_x)
-        dev_loss = criterion(dev_out, dev_y)
+        dev_out = torch.Tensor(model.predict(dev_x)).type(torch.float32)
+        dev_loss = my_loss(dev_out, dev_y.type(torch.float32))
         all_dev_loss.append(dev_loss.item())
-        dev_pred = dev_out.max(axis=1)[1]
-        dev_acc = torch.eq(dev_pred, dev_y).sum().float() / len(dev_x)
+        dev_pred = dev_out
+        dev_acc = torch.eq(dev_pred, dev_y.type(torch.float32)).sum().float() / len(dev_x)
         all_dev_acc.append(dev_acc)
 
         print(f"Epoch: {epoch}\n  train accuracy: {train_acc}  train loss: {train_loss}")
         print(f"  dev accuracy: {dev_acc}  dev loss: {dev_loss}")
 
-    test_pred = model(test_x).max(axis=1)[1]
-    test_acc = torch.eq(test_pred, test_y).sum().float() / len(test_x)
+    test_pred = torch.Tensor(model.predict(test_x)).type(torch.float32)
+    test_acc = torch.eq(test_pred, test_y.type(torch.float32)).sum().float() / len(test_x)
     print(test_acc)
 
     fig, (ax1, ax2) = plt.subplots(2)

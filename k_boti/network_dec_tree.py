@@ -1,3 +1,5 @@
+from collections import Counter
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -6,7 +8,7 @@ import torch.optim as optim
 import torch.nn.functional as torch_fun
 from neuralinput import process_patient_files, read_neural_inputs_from_pickle
 
-from sklearn import svm
+from sklearn import tree
 from neuralinput import NeuralInput
 
 
@@ -110,18 +112,15 @@ def diagnoses_converter(all_diagnoses):
     category_dir = {
         'HCM': 0,
         'Normal': 1,
-        'U18_m': 2,
-        'U18_f': 3,
-        'Aortastenosis': 4,
-        'AMY': 5,
-        'Other': 6
+        'Other': 2
     }
     diagnoses_converted = []
     for diagnoses in all_diagnoses:
         if diagnoses in category_dir:
             diagnoses_converted.append(category_dir[diagnoses])
         else:
-            diagnoses_converted.append(6)
+            diagnoses_converted.append(2)
+    occurence_count = Counter(diagnoses_converted)
     return diagnoses_converted
 
 
@@ -184,13 +183,13 @@ def train_neural_network(neural_inputs_pickles_path):
     all_data_y = torch.Tensor(diagnoses_converter(get_all_diagnoses(neural_inputs))).type(torch.int64)
 
     # concatenate all the available data to one tensor as the input
-    # concat_all_data_x = torch.cat((distances, wall_thicknesses, polygons), 1)
+    concat_all_data_x = torch.cat((distances, wall_thicknesses, polygons), 1)
 
     # concat_all_data_x = torch.cat((distances, polygons), 1)
     # concat_all_data_x = torch.cat((distances, wall_thicknesses), 1)
     # concat_all_data_x = torch.cat((polygons, wall_thicknesses), 1)
 
-    concat_all_data_x = distances
+    # concat_all_data_x = distances
     # concat_all_data_x = polygons
     # concat_all_data_x = wall_thicknesses
 
@@ -216,9 +215,9 @@ def train_neural_network(neural_inputs_pickles_path):
     print("Dev size:", dev_x.size(), dev_y.size())
     print("Test size:", test_x.size(), test_y.size())
 
-    model = svm.LinearSVC(C=1.0)
+    model = tree.DecisionTreeClassifier()
 
-    criterion = nn.CrossEntropyLoss()
+    # model.criterion = nn.CrossEntropyLoss()
     # optimizer = optim.Adam(model.loss)
 
     batch_size = 20
@@ -229,16 +228,17 @@ def train_neural_network(neural_inputs_pickles_path):
     all_train_acc = []
     all_dev_acc = []
 
-    for epoch in range(200):
+    for epoch in range(1):
         # training loop
         for bi, (batch_x, batch_y) in enumerate(train_iter.iterate_once()):
             y_out = model.fit(batch_x, batch_y)
-            loss = model.loss
+            tree.plot_tree(model.fit(train_x, train_y))
             # optimizer.zero_grad()
             # optimizer.step()
 
         # one train epoch finished, evaluate on the train and the dev set (NOT the test)
         train_out = torch.Tensor(model.predict(train_x)).type(torch.float32)
+
         train_loss = my_loss(train_out, train_y.type(torch.float32))
         all_train_loss.append(train_loss.item())
         train_pred = train_out
